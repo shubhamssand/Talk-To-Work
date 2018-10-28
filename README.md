@@ -18,7 +18,7 @@
 
 Project Team 21
 
-### Project Ideas :
+### Project Ideas : None approved, submit other innovative ideas.
 
 
 
