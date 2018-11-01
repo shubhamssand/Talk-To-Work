@@ -35,24 +35,3 @@ As a software engineer, we have to use different technologies at workplace to ge
 We are thinking to use Google's Dialogflow and build conversational user experience using Google Assistant to start with. It provides new ways to interact with your product by building engaging voice and text-based conversational interfaces powered by Artificial Intelligence. Dialogflow incorporates Google's machine learning expertise as well.
 
 ![workflow](workflow.png)
-
-
-### Certify Identity of students
-
-- **Abstract**
-
-Verifying academic qualifications (which are often needed for work visas) can be a slow and painful process. 
-
-
-
-India student  applying for a masters  in the US? Russian developer seeking work in Belgium? When universities have to be contacted individually and employer  or student references have to be verified over the phone or email, these processes consume time and money. 
-
-- **Description**
-
-Imagine a world where your certifications were written into a secure global data structure where they could not be deleted or altered. And the concerned parties would just have to see through the documents that are already verified by concerned parties like in case of passport verified by the Passport Authority of India.
-
-**Proposed Methodology**
-
-- Hyperledger Composer
-
-- Hyperledger Fabric
