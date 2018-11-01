@@ -16,11 +16,11 @@
 
 Project Team 21
 
-## Project Ideas : None approved, submit other innovative ideas.
+## Project Ideas : 
 
 
 
-### Conversational User Experience For Workplace
+### Conversational User Experience For Workplace  - APPROVED
 
 - **Abstract**
 
