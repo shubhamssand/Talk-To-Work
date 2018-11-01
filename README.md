@@ -1,8 +1,6 @@
- # Project Team 21
+# Project Team 21
 
-
-
-### Student Names :
+## Student Names :
 
 - Mayur Barge
 
@@ -14,19 +12,19 @@
 
 
 
-### Team Name :
+## Team Name :
 
 Project Team 21
 
-### Project Ideas : None approved, submit other innovative ideas.
+## Project Ideas : None approved, submit other innovative ideas.
 
 
 
-##### - Conversational User Experience For Workplace
+### Conversational User Experience For Workplace
 
 - **Abstract**
 
-There are various tools used at software companies viz. version control system, CI/CD tool to ship products on time with efficient developer experience. Build conversational user experience on mobile for these tools. 
+There are various tools used at software companies viz. version control system, CI/CD tools to ship products on time with efficient developer experience. Developer finds it difficult to get information from various resources. Build conversational user experience on mobile for these tools. 
 
 - **Description**
 
@@ -34,11 +32,12 @@ As a software engineer, we have to use different technologies at workplace to ge
 
 - **Proposed Methodology**
 
-We are thinking to use Google's Dialogflow and build conversational user experience using Google Assistant to start with. However Dialogflow has integration with other platforms like Facebook messanger, Alexa.
+We are thinking to use Google's Dialogflow and build conversational user experience using Google Assistant to start with. It provides new ways to interact with your product by building engaging voice and text-based conversational interfaces powered by Artificial Intelligence. Dialogflow incorporates Google's machine learning expertise as well.
+
+![workflow](workflow.png)
 
 
-
-##### - Certify Identity of students
+### Certify Identity of students
 
 - **Abstract**
 
