@@ -3,7 +3,7 @@
 // var request = require('request-promise');
 // request({
 //   "method":"GET", 
-//   "uri": "https://api.github.com/repos/SJSU272LabF18/Project-Team-9/collaborators?access_token=d48b7b3338d61530444466678a4d57c6ed08452d",
+//   "uri": "https://api.github.com/repos/SJSU272LabF18/Project-Team-9/collaborators?access_token=",
 //   "json": true,
 //   "headers": {
 //     //"Authorization": "Bearer " + github.token,
