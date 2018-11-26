@@ -1,12 +1,11 @@
 'use strict';
-
 const functions = require('firebase-functions');
 const {WebhookClient} = require('dialogflow-fulfillment');
-var jenkins = require('jenkins')({ baseUrl: 'http://admin:SJSU2018@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
+var jenkins = require('jenkins')({ baseUrl: 'http://<user>:<pass>@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
 
 //GitHub Constants
 var github = require('octonode');
-var github_token = "d48b7b3338d61530444466678a4d57c6ed08452d";
+var github_token = "";
 var github_owner = "thevarunjain";
 var github_repo = "Project-Team-21";
 var github_org = "SJSU272LabF18";
@@ -46,7 +45,9 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
         }
         console.log(jobName);
         if (!jobName) {
+            console.log(agent.contexts);
             var context = agent.context.get('jenkins-job');
+            console.log(context);
             if (!context.parameters.jobName){
                 return agent.add('Job Name is missing. Sorry.');
             }
@@ -59,12 +60,29 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     }
     
     function githubIssue(agent){
-      return getGithubIssue().then((data) => {
-            agent.add(data);
+      return getGithubIssue(agent.parameters.repoNameEntity).then((data) => {
+                agent.add(data);
         }).catch((err) => {
             agent.add("Error in connecting to GitHub");
         });        
     }
+    
+    function githubTopRepos(agent){
+    return maxCommitRepo().then((data) => {
+        agent.add(data);
+      }).catch((err) => {
+         agent.add("Error in connecting to GitHub", err);
+      });          
+    }
+    
+    function githubIssueDetails(){
+    return getDetailedIssueInRepo(agent.parameters.repoNameEntity).then((data) => {
+         agent.add(data);
+      }).catch((err) => {
+          agent.add("Error in connecting to GitHub", err);
+      });        
+    }
+    
     
     let intentMap = new Map();
     intentMap.set('jenkins.status', jenkinsStatus);
@@ -72,6 +90,8 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     intentMap.set('jenkins.job.status', jenkinsJobStatus);
     intentMap.set('jenkins.job.trigger', jenkinsJobTrigger);
     intentMap.set('github.issue', githubIssue);
+    intentMap.set('github.topRepos', githubTopRepos);
+    intentMap.set('github.issueDetails', githubIssueDetails);
 
     agent.handleRequest(intentMap);
 });
@@ -166,7 +186,7 @@ function getJenkinsStatus(){
 }
 
 
-function getGithubIssue(){
+function getGithubIssue(github_repo){
     return new Promise((resolve, reject) => {
     var res = "";
         
@@ -184,11 +204,105 @@ function getGithubIssue(){
             res=`There are ${result.length} issues in ${github_repo} repository`;
             resolve(res);
         }
-        // result.map((data)=>{
-        //     console.log(data.state==="open"); //json object
-        //         res += data.title;
-        // });
     }
     });
 });
+}
+
+
+
+
+function maxCommitRepo(){
+    return new Promise((resolve, reject) => {
+        
+    var sortCommit = [];
+    var flag = null;
+    var res = "";        
+    client.get(`/orgs/${github_org}/repos`, {}, function (err, status, result, headers) {
+    if(err){
+        reject(err);
+    }else{
+        let ret = [];
+        console.log("Total Repos in org",result.length);
+
+         result.map((data)=>{
+            //  console.log("\nRepo Name",);
+             var repo_name = data.name;
+             // console.log("Last push by repo",data.pushed_at)
+             // console.log("Open issue count in a repo",data.open_issues_count)
+             // console.log("Open issue in a repo",data.open_issues)
+            client.get(`repos/SJSU272LabF18/${repo_name}/commits`, {}, function (err, status, response, headers) {           
+                    var max= 0; 
+                    var top = [];
+                     //console.log("\nTotal commit by repo ",data.name, "->", response.length);
+                     var repo_with_commit = {
+                        repo_name : data.name,
+                        commit : response.length
+                     }
+                     sortCommit.push(repo_with_commit);
+                        if(sortCommit.length === 30){
+                            sortCommit.map((repo)=>{
+                                if(repo.commit >= max ){
+                                    max = repo.commit
+                                }
+                            })
+                            sortCommit.map((repo)=>{
+                                if(repo.commit === max ){
+                                    top.push(repo.repo_name)
+                                }
+                            })
+                            if(top.length === 1){
+                               // console.log("The max commits is done by",top[0]);
+                                 var res = `The maximum commit is ${max} is done by ${top}` 
+                            resolve(res);
+
+                            }else if(top.length >= 1){
+                               // console.log("The max commits are done by "+ top.length + " repositories ",names);
+                                var res2 = `The maximum commit is ${max} which is done by ${top.length} repositories ${top}`
+                                resolve(res2);
+                            }
+
+                            
+                        }
+                     
+                 })        
+         })
+    }
+    });
+});
+}
+
+function getDetailedIssueInRepo(github_repo){
+        // var github_repo = agent.parameters.repo;
+
+        return new Promise((resolve, reject) => {
+            var issue_body = [];
+            client.get(`/repos/${github_org}/${github_repo}/issues`, {}, function (err, status, result, headers) {
+                if(err){
+                    reject(err);
+                }else{
+                        for(var i=0;i<result.length;i++){
+                            issue_body.push(result[i].title)
+                        }   
+                        //resolve(issue_body);
+                        if(issue_body.length === 0){
+                            console.log(`No issues found in ${github_repo} repositories` );
+                            var res = `No issues found in ${github_repo} repositories` 
+                            resolve(res);
+                        }
+
+                        if(issue_body.length === 1){
+                            console.log(`The issue found in ${github_repo} repositories is ${issue_body}` );
+                              var res1 = `The issue found in ${github_repo} repositories is ${issue_body}` 
+                             resolve(res1);
+
+                         }else if(issue_body.length >= 1){
+                            console.log(`The issues in ${github_repo} repositories are ${issue_body}`);
+                             var res2 = `The issues in ${github_repo} repositories are ${issue_body}`
+                             resolve(res2);
+                         }
+                }
+        
+            })
+        })
 }
