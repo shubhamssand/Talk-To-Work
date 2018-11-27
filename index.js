@@ -1,15 +1,38 @@
 'use strict';
 const functions = require('firebase-functions');
 const {WebhookClient} = require('dialogflow-fulfillment');
-var jenkins = require('jenkins')({ baseUrl: 'http://<user>:<pass>@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
+var jenkins = require('jenkins')({ baseUrl: 'http://admin:SJSU2018@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
+var request = require('request');
 
 //GitHub Constants
 var github = require('octonode');
-var github_token = "";
+var github_token = "7668994a1dab506216e22c26da98826769b62e31";
 var github_owner = "thevarunjain";
 var github_repo = "Project-Team-21";
 var github_org = "SJSU272LabF18";
 var client = github.client(github_token);
+
+//JIRA Constants
+var options = {
+   method: 'GET',
+   url: 'https://cmpe272.atlassian.net/rest/agile/1.0/epic/SJSU-10/issue',
+   auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+   headers: {
+      'Accept': 'application/json'
+   }
+};
+
+//SPLUNK Constants
+var splunkjs = require('splunk-sdk');
+var service = new splunkjs.Service({
+    username: "admin",
+    password: "Vandana$5657",
+    scheme:"https",
+    host:"52.8.36.104",
+    port:"8089"
+  });
+var searchQuery = " search host=ec2-34-205-23-63.compute-1.amazonaws.com | spath job_result | search job_result=FAILURE"
+
 
 
 exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, response) => {
@@ -82,6 +105,64 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
           agent.add("Error in connecting to GitHub", err);
       });        
     }
+    function githubCommits(){
+    return getLastCommits(agent.parameters.repoNameEntity,agent.parameters.number).then((data) => {
+         agent.add(data);
+      }).catch((err) => {
+          agent.add("Error in connecting to GitHub", err);
+      });        
+    }
+    
+    
+    
+    
+    
+    
+    //JIRA Functions
+    function issueToBacklog(){
+        return moveissueToBacklog(agent.parameters.issue).then((data) => {
+             agent.add(data);
+          }).catch((err) => {
+              agent.add("Error in connecting to GitHub", err);
+          });        
+    }
+    
+    function stories (agent){
+        return aggregateNames(agent.parameters.usernames).then((data) => {
+        //var count=0;
+        agent.add(data);
+        }).catch((err) => {
+            agent.add('JIRA server is unavailable');
+        });
+    }
+    
+    //SPLUNK Functions
+    function splunkStatus (agent){
+        return getSplunkStatus().then((data) => {
+            var count=0;
+            var appsList = data.list();
+            for(var i = 0; i < appsList.length; i++) {
+                var app = appsList[i];
+                count+=1;
+            }
+            agent.add(`Splunk is up and runing and has ${count} apps running.And yeah I can help you with logs information.`);
+        }).catch((err) => {
+            agent.add('Splunk server is unavailable');
+        });
+    }
+    
+    
+    function splunkQuery (agent){
+        return getSplunkQuery(agent.parameters.date[0],agent.parameters.date[1]).then((data) => {
+            if(data===0){
+            agent.add(`Jenkins Sever has no failed builds`);
+            }else{
+                agent.add(`Jenkins Sever had  ${data} builds failed.`);
+            }
+        }).catch((err) => {
+            agent.add('Jenkins Sever has no failed builds');
+        });
+    }
     
     
     let intentMap = new Map();
@@ -89,9 +170,17 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     intentMap.set('jenkins.job', jenkinsJobs);    
     intentMap.set('jenkins.job.status', jenkinsJobStatus);
     intentMap.set('jenkins.job.trigger', jenkinsJobTrigger);
+    
     intentMap.set('github.issue', githubIssue);
     intentMap.set('github.topRepos', githubTopRepos);
     intentMap.set('github.issueDetails', githubIssueDetails);
+    intentMap.set('github.lastCommits', githubCommits);
+    
+    intentMap.set('jira.moveIssueToBacklog', issueToBacklog);
+    intentMap.set('jira.stories', stories);
+
+    intentMap.set('splunk.Status', splunkStatus);
+    intentMap.set('splunk.time', splunkQuery);
 
     agent.handleRequest(intentMap);
 });
@@ -210,8 +299,6 @@ function getGithubIssue(github_repo){
 }
 
 
-
-
 function maxCommitRepo(){
     return new Promise((resolve, reject) => {
         
@@ -305,4 +392,177 @@ function getDetailedIssueInRepo(github_repo){
         
             })
         })
+}
+
+
+function getLastCommits(github_repo, number){
+        // var github_repo = agent.parameters.repo;
+        var n=number;
+        var last_commits = [];
+        var names = '';
+        return new Promise((resolve, reject) => {
+            var issue_body = [];
+            client.get(`/repos/${github_org}/${github_repo}/commits`, {}, function (err, status, result, headers) {
+                if(err){
+                    reject(err);
+                }else{
+                    for(var i=0;i<=n-1;i++){
+                        last_commits.push(result[i].commit.author)
+                    }
+                    var value;
+                    last_commits.map((com,i)=>{   
+                         value = names + com.name + " ";
+                         value = value + "on"  + " "
+                         value = value + com.date.slice(0,10) + " at " 
+                         names = value + com.date.slice(11,16) + ", " 
+                    })
+                    var data = `Last ${n} commits for ${github_repo} are done by ${names} ` 
+                   resolve(data);
+                }
+            })
+        })
+}
+
+
+
+
+
+
+
+
+
+
+
+
+function moveissueToBacklog(issue){
+      //    "SJSU-12"
+    var issue_num = issue;
+    var bodyData = `{
+        "issues": [
+
+        ]
+      }`;
+      console.log(JSON.parse(bodyData))
+      var newIssue = JSON.parse(bodyData);
+      console.log(".........",newIssue.issues)
+      newIssue.issues.push(issue_num)
+      console.log(".........",newIssue.issues)
+      console.log(newIssue)
+        bodyData = JSON.stringify(newIssue)      
+        console.log(bodyData)
+      
+
+    var options = {
+        method: 'POST',
+        url: 'https://cmpe272.atlassian.net/rest/agile/1.0/backlog/issue',
+        auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+        headers: {
+       //  "Authorization" : "Basic 4oNotFMGrXuCUQeGjEUhEC10",
+           'Content-Type': 'application/json'
+        },
+        body: bodyData
+     };
+
+    return new Promise((resolve, reject) => {
+            request(options, function (err, response, body) {
+            if(err){
+                reject(err);
+            }else{
+                console.log('Response: '+ response.statusCode);
+                console.log(body);
+               
+                var data = `Issue ${issue_num} has been moved to backlog`
+                resolve(data);
+            }
+        })
+    })
+}
+
+//JIRA
+
+let a=['abhishek.konduri','varun.jain','shubhamsandeep.sand','mayur.barge']
+function aggregateNames(name){
+    var obj={};
+    return new Promise((resolve, reject) => {
+        request(options, function (error, response, body) {
+            if (error) {reject(error)}
+            //    console.log(
+            //       'Response: ' + response.statusCode + ' ' + response.statusMessage
+            //    );
+            let temp=JSON.parse(body);
+            //console.log(temp.issues[0]);
+            var count=0;
+            for (var i=0 ;i<temp.issues.length;i++){
+                if(temp.issues[i].fields.assignee.name.includes(name)){
+                    count+=1
+                }
+            }
+            //console.log(temp.issues[0].fields.assignee.name);
+            var show=`${name} has ${count} number of stories assigned`
+            resolve(show);
+            //resolve(` this user ${name} `+ count);
+        });
+    })
+}
+
+//SPLUNK 
+
+function getSplunkStatus(){
+    return new Promise((resolve, reject) => {
+        var res = "";
+        service.login(function(err, success) {
+            if (err) {
+                console.log("err-------------")
+                reject(err);
+            }
+            console.log("Login was successful: " + success);
+            service.apps().fetch(function(err, apps) {
+                if (err) {
+                    reject(err);
+                }
+                resolve(apps);
+            });
+        });
+        
+    });
+}
+
+
+function getSplunkQuery(a,b){
+    return new Promise((resolve, reject) => {
+        var res = "";
+        var searchParams = {
+            earliest_time: new Date(a),
+            latest_time: new Date(b),
+            //output_mode: "json_rows"
+        };
+        service.oneshotSearch(
+            searchQuery,
+            searchParams,
+            function(err, results) {
+                // Display the results
+                if(err)
+                {
+                    reject(err)
+                }
+                var fields = results.fields;
+                var rows = results.rows;
+                var count=0;
+                for(var i = 0; i < rows.length; i++) {
+                    var values = rows[i];
+                    console.log("Row " + i + ": ");
+                    var data1="";
+                    for(var j = 0; j < values.length; j++) {
+                        var field = fields[j];
+                        var value = values[j];
+                        if(field=='_raw'){
+                            count+=1;
+                        }
+                        // console.log("  " + field + ": " + value);
+                    }
+                }
+                resolve(count);
+            }
+        );
+    });
 }
