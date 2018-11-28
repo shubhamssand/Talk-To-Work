@@ -1,7 +1,7 @@
 'use strict';
 const functions = require('firebase-functions');
 const {WebhookClient} = require('dialogflow-fulfillment');
-var jenkins = require('jenkins')({ baseUrl: 'http://admin:SJSU2018@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
+var jenkins = require('jenkins')({ baseUrl: 'http://<u>:<p>@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
 var request = require('request');
 
 //GitHub Constants
