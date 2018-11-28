@@ -6,7 +6,7 @@ var request = require('request');
 
 //GitHub Constants
 var github = require('octonode');
-var github_token = "7668994a1dab506216e22c26da98826769b62e31";
+var github_token = "";
 var github_owner = "thevarunjain";
 var github_repo = "Project-Team-21";
 var github_org = "SJSU272LabF18";
