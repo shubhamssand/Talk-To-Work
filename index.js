@@ -387,7 +387,7 @@ function maxCommitRepo(){
          //  client.get(`repos/SJSU272LabF18/${repo_name}/commits`, {}, function (err, status, response, headers) {  
              request({
   "method":"GET", 
-  "uri": `https://api.github.com/repos/SJSU272LabF18/${repo_name}/commits?access_token=cdd6fdb6c9454c301d140bf13ff543ba5ab8807e&per_page=250`,
+  "uri": `https://api.github.com/repos/SJSU272LabF18/${repo_name}/commits?access_token=&per_page=250`,
   "json": true,
   "headers": {
     //"Authorization": "Bearer " + github.token,
