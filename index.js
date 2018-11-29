@@ -1,38 +1,54 @@
 'use strict';
 const functions = require('firebase-functions');
 const {WebhookClient} = require('dialogflow-fulfillment');
-var jenkins = require('jenkins')({ baseUrl: 'http://<u>:<p>@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
+var jenkins = require('jenkins')({ baseUrl: 'http://admin:SJSU2018@ec2-54-87-132-101.compute-1.amazonaws.com:8080', crumbIssuer: true });
 var request = require('request');
+const {Card, Suggestion} = require('dialogflow-fulfillment');
+const {Permission} = require('actions-on-google');
+
+var request = require('request-promise');
+
+const timeZone = 'America/Los_Angeles'; 
+const timeZoneOffset = '-08:00';  
+
+const {google} = require('googleapis');
+process.env.DEBUG = 'dialogflow:*'; // It enables lib debugging statements
 
 //GitHub Constants
 var github = require('octonode');
 var github_token = "";
-var github_owner = "thevarunjain";
-var github_repo = "Project-Team-21";
+var github_owner = "";
+var github_repo = "";
 var github_org = "SJSU272LabF18";
 var client = github.client(github_token);
 
 //JIRA Constants
-var options = {
-   method: 'GET',
-   url: 'https://cmpe272.atlassian.net/rest/agile/1.0/epic/SJSU-10/issue',
-   auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
-   headers: {
-      'Accept': 'application/json'
-   }
+/*var options = {
+        method: 'GET',
+        url: 'https://cmpe272.atlassian.net/rest/agile/1.0/epic/SJSU-10/issue',
+        auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+        headers: {
+            'Accept': 'application/json'
+        }
 };
-
+*/
 //SPLUNK Constants
 var splunkjs = require('splunk-sdk');
 var service = new splunkjs.Service({
-    username: "admin",
-    password: "Vandana$5657",
+    username: "",
+    password: "",
     scheme:"https",
-    host:"52.8.36.104",
+    host:"",
     port:"8089"
   });
-var searchQuery = " search host=ec2-34-205-23-63.compute-1.amazonaws.com | spath job_result | search job_result=FAILURE"
+var searchQuery = "  | spath job_result | search job_result=FAILURE"
 
+  function getLocaleDateString(dateObj){
+    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: timeZone });
+  }
+  function getLocaleTimeString(dateObj){
+    return dateObj.toLocaleTimeString('en-US', { hour: 'numeric',minute :"numeric", hour12: true, timeZone: timeZone });
+  }
 
 
 exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, response) => {
@@ -86,7 +102,7 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
       return getGithubIssue(agent.parameters.repoNameEntity).then((data) => {
                 agent.add(data);
         }).catch((err) => {
-            agent.add("Error in connecting to GitHub");
+            agent.add("I am unable to connect with GitHub right now");
         });        
     }
     
@@ -94,7 +110,7 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     return maxCommitRepo().then((data) => {
         agent.add(data);
       }).catch((err) => {
-         agent.add("Error in connecting to GitHub", err);
+         agent.add("I am unable to connect with GitHub right now");
       });          
     }
     
@@ -102,14 +118,14 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     return getDetailedIssueInRepo(agent.parameters.repoNameEntity).then((data) => {
          agent.add(data);
       }).catch((err) => {
-          agent.add("Error in connecting to GitHub", err);
+          agent.add("I am unable to connect with GitHub right now");
       });        
     }
     function githubCommits(){
     return getLastCommits(agent.parameters.repoNameEntity,agent.parameters.number).then((data) => {
          agent.add(data);
       }).catch((err) => {
-          agent.add("Error in connecting to GitHub", err);
+          agent.add("I am unable to connect with GitHub right now");
       });        
     }
     
@@ -123,18 +139,62 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
         return moveissueToBacklog(agent.parameters.issue).then((data) => {
              agent.add(data);
           }).catch((err) => {
-              agent.add("Error in connecting to GitHub", err);
+              agent.add("Error in connecting to JIRA", err);
           });        
     }
     
-    function stories (agent){
+    //Jira
+   
+    function stories(agent){
         return aggregateNames(agent.parameters.usernames).then((data) => {
-        //var count=0;
-        agent.add(data);
+            console.log(data);
+            agent.add(data);
         }).catch((err) => {
-            agent.add('JIRA server is unavailable');
-        });
+             console.log("Error in connecting to JIRA", err);
+            agent.add('Connection Error')
+            console.log("Error in connecting to JIRA", err);
+        });    
     }
+    
+    //JIRA - stories in active sprint
+    
+    function sprintStories(){
+    return getsprintStories().then((data) => {
+        console.log(data);
+        agent.add(data)
+     }).catch((err) => {
+        agent.add("No Stories in active sprint in  JIRA", err);
+     });    
+  }
+
+    //JIRA - story status
+    
+    function storyStatus(agent){
+    return getstoryStatus(agent.parameters.id).then((data) => {
+        console.log(data);
+        agent.add(data);
+     }).catch((err) => {
+         agent.add("Cant fetch the status of story at the moment.")
+        console.log("Error in connecting to JIRA", err);
+     });    
+  }
+
+//   storyStatus('SJSU-7')
+
+//JIRA - Transition
+
+function sprintTransition(agent){
+    return getMoveTask(agent.parameters.id,agent.parameters.transition).then((data) => {
+       console.log(data);
+       agent.add(data);
+     }).catch((err) => {
+         agent.data('Currently cannot chnage the status.Please try again after sometime');
+       console.log("Error in connecting to JIRA", err);
+     });    
+  }
+
+ // sprintTransition('SJSU-8',11)
+
     
     //SPLUNK Functions
     function splunkStatus (agent){
@@ -145,7 +205,7 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
                 var app = appsList[i];
                 count+=1;
             }
-            agent.add(`Splunk is up and runing and has ${count} apps running.And yeah I can help you with logs information.`);
+            agent.add(`Splunk is up and runing and has ${count} apps running.`);
         }).catch((err) => {
             agent.add('Splunk server is unavailable');
         });
@@ -153,7 +213,8 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     
     
     function splunkQuery (agent){
-        return getSplunkQuery(agent.parameters.date[0],agent.parameters.date[1]).then((data) => {
+        console.log(agent.parameters);
+        return getSplunkQuery(agent.parameters['date-period'].startDate, agent.parameters['date-period'].endDate).then((data) => {
             if(data===0){
             agent.add(`Jenkins Sever has no failed builds`);
             }else{
@@ -178,6 +239,10 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     
     intentMap.set('jira.moveIssueToBacklog', issueToBacklog);
     intentMap.set('jira.stories', stories);
+    intentMap.set('jira.activeSprint', sprintStories);
+    intentMap.set('jira.storyStatus', storyStatus);
+    intentMap.set('jira.storyChangeState', sprintTransition);
+
 
     intentMap.set('splunk.Status', splunkStatus);
     intentMap.set('splunk.time', splunkQuery);
@@ -284,13 +349,13 @@ function getGithubIssue(github_repo){
         reject(err);
     }else{
         if(result.length===0){
-            res = `No issues found in ${github_repo} repository`;
+            res = `No issues or pull request found in ${github_repo} repository`;
             resolve(res);
         }else if(result.length===1){
-            res=`There is ${result.length} issue in ${github_repo} repository`;
+            res=`There is ${result.length} issue or pull request in ${github_repo} repository`;
             resolve(res);
         }else if(result.length>=1){
-            res=`There are ${result.length} issues in ${github_repo} repository`;
+            res=`There are ${result.length} issues or pull request in ${github_repo} repository`;
             resolve(res);
         }
     }
@@ -318,7 +383,20 @@ function maxCommitRepo(){
              // console.log("Last push by repo",data.pushed_at)
              // console.log("Open issue count in a repo",data.open_issues_count)
              // console.log("Open issue in a repo",data.open_issues)
-            client.get(`repos/SJSU272LabF18/${repo_name}/commits`, {}, function (err, status, response, headers) {           
+             
+         //  client.get(`repos/SJSU272LabF18/${repo_name}/commits`, {}, function (err, status, response, headers) {  
+             request({
+  "method":"GET", 
+  "uri": `https://api.github.com/repos/SJSU272LabF18/${repo_name}/commits?access_token=cdd6fdb6c9454c301d140bf13ff543ba5ab8807e&per_page=250`,
+  "json": true,
+  "headers": {
+    //"Authorization": "Bearer " + github.token,
+    "User-Agent": "My little demo app"
+  }
+}).then((response)=>{
+    console.log(response.length);
+   
+
                     var max= 0; 
                     var top = [];
                      //console.log("\nTotal commit by repo ",data.name, "->", response.length);
@@ -345,14 +423,15 @@ function maxCommitRepo(){
 
                             }else if(top.length >= 1){
                                // console.log("The max commits are done by "+ top.length + " repositories ",names);
-                                var res2 = `The maximum commit is ${max} which is done by ${top.length} repositories ${top}`
+                                var res2 = {text: `The maximum commit is ${max} which is done by ${top.length} repositories ${top}`, d :top}
                                 resolve(res2);
                             }
 
                             
                         }
                      
-                 })        
+                 })//end of 2nd client
+                 
          })
     }
     });
@@ -412,11 +491,17 @@ function getLastCommits(github_repo, number){
                     var value;
                     last_commits.map((com,i)=>{   
                          value = names + com.name + " ";
-                         value = value + "on"  + " "
-                         value = value + com.date.slice(0,10) + " at " 
-                         names = value + com.date.slice(11,16) + ", " 
+                         value = value + "on"  + " ";
+                         value = value + getLocaleDateString(new Date(com.date)) + " at " ;
+                         names = value + getLocaleTimeString(new Date(com.date)) + ", " ;
+                         
+                        //  value = value + com.date.slice(0,10) + " at " 
+                        //  names = value + com.date.slice(11,16) + ", " 
                     })
-                    var data = `Last ${n} commits for ${github_repo} are done by ${names} ` 
+                    
+
+
+                    var data = `The last ${n} commits for ${github_repo} are done by\n ${names} ` 
                    resolve(data);
                 }
             })
@@ -479,30 +564,168 @@ function moveissueToBacklog(issue){
 }
 
 //JIRA
-
-let a=['abhishek.konduri','varun.jain','shubhamsandeep.sand','mayur.barge']
+ //var request = require('request');
+let a=['abhishek.konduri','varun.jain','shubhamsandeep.sand','mayur.barge'];
 function aggregateNames(name){
+    let options = {
+        method: 'GET',
+        url: 'https://cmpe272.atlassian.net/rest/agile/1.0/epic/SJSU-10/issue',
+        auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+        headers: {
+            'Accept': 'application/json'
+        }
+};
     var obj={};
     return new Promise((resolve, reject) => {
         request(options, function (error, response, body) {
-            if (error) {reject(error)}
-            //    console.log(
-            //       'Response: ' + response.statusCode + ' ' + response.statusMessage
-            //    );
+            if (error) {
+                console.log('#########',error)
+                reject(error)}
+                console.log('Response: ' + response.statusCode + ' ' + response.statusMessage
+            );
             let temp=JSON.parse(body);
-            //console.log(temp.issues[0]);
+            //console.log(temp.issues);
             var count=0;
             for (var i=0 ;i<temp.issues.length;i++){
-                if(temp.issues[i].fields.assignee.name.includes(name)){
-                    count+=1
+                for(var j=0 ; j<a.length ; j++){
+                    if(temp.issues[i].fields.assignee){
+                        if(a[j].includes(temp.issues[i].fields.assignee.name) && temp.issues[i].fields.assignee.name.startsWith(name)){
+                            count+=1
+                        }
+                    }
                 }
             }
             //console.log(temp.issues[0].fields.assignee.name);
-            var show=`${name} has ${count} number of stories assigned`
-            resolve(show);
-            //resolve(` this user ${name} `+ count);
+            resolve( name+ ' has ' +' '+ count + ' stories in active Sprint');
         });
     })
+}
+
+//JIRA - Issues in active sprint
+
+function getsprintStories(){
+    
+    
+let options = {
+    method: 'GET',
+    url: `https://cmpe272.atlassian.net/rest/agile/1.0/sprint/${2}/issue`,
+    auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+    headers: {
+        'Accept': 'application/json'
+    }
+ };
+    var outString="";
+return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+        if (error){
+            reject(error)}
+        console.log(
+            'Response: ' + response.statusCode + ' ' + response.statusMessage
+        );
+     
+        let temp=JSON.parse(body);
+        //console.log(temp.issues[1]);
+        let len=temp.issues.length;
+        
+        for (var i=0 ; i<temp.issues.length-1; i++){
+            // console.log("inside");
+            outString+=temp.issues[i].fields.summary+" with id "+ temp.issues[i].key +" ,"
+        }
+        outString+=temp.issues[len-1].fields.summary+" with id "+ temp.issues[len-1].key ;
+        //console.log('iii',outString);
+        var display="The stories in active sprint are : " + outString + " Would you also like to know about the status of any of these stories ? ";
+        resolve(display);
+     });
+  
+})
+
+}
+
+//JIRA- Story Status
+
+function getstoryStatus(name){
+
+return new Promise((resolve, reject) => {
+    
+    let options = {
+    method: 'GET',
+    url: 'https://cmpe272.atlassian.net/rest/agile/1.0/issue/SJSU-7',
+    auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+ 
+    headers: {
+        'Accept': 'application/json'
+    }
+ 
+ };
+    request(options, function (error, response, body) {
+        if (error) {
+            reject(error);
+        }
+        console.log(
+            'Response: ' + response.statusCode + ' ' + response.statusMessage
+        );
+        console.log(JSON.parse(body).fields.status.name);
+        resolve("Story "+name+" is in "+JSON.parse(body).fields.status.name +" state")
+     });
+})
+}
+
+//JIRA -Transiion
+
+function getMoveTask(a,b){
+
+let bodyData = `{
+  "transition": {
+    "id": ${b}
+  }
+}`;
+
+
+   let options = {
+   method: 'POST',
+   url: `https://cmpe272.atlassian.net/rest/api/3/issue/${a}/transitions`,
+      auth: { username: 'mayur.barge@sjsu.edu', password: '4oNotFMGrXuCUQeGjEUhEC10' },
+   headers: {
+      'Content-Type': 'application/json'
+   },
+   body: bodyData
+};
+
+  
+    //var outString="";
+return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+        console.log('@@@@@@@@')
+   if (error) 
+   {
+       reject(error);
+   }
+//    console.log(
+//       'Response: ' + response.statusCode + ' ' + response.statusMessage
+//    );
+var obj={
+    a:'To Do',
+    b:'In Progress',
+    c:'Done'
+}
+   console.log(body);
+//    let temp=JSON.parse(body);
+//    console.log(temp);
+
+console.log(typeof(b),b);
+if (b==21){
+    resolve("Moved "+a +" to " + obj.b);
+}else if(b==31){
+    resolve("Moved "+a +" to " + obj.c);
+}else{
+    resolve("Moved "+a +" to " + obj.a);
+}
+
+});
+    
+  
+})
+
 }
 
 //SPLUNK 
@@ -528,41 +751,59 @@ function getSplunkStatus(){
 }
 
 
-function getSplunkQuery(a,b){
+function getSplunkQuery(a, b){
     return new Promise((resolve, reject) => {
-        var res = "";
         var searchParams = {
-            earliest_time: new Date(a),
-            latest_time: new Date(b),
-            //output_mode: "json_rows"
-        };
-        service.oneshotSearch(
-            searchQuery,
-            searchParams,
-            function(err, results) {
-                // Display the results
-                if(err)
-                {
-                    reject(err)
-                }
-                var fields = results.fields;
-                var rows = results.rows;
-                var count=0;
-                for(var i = 0; i < rows.length; i++) {
-                    var values = rows[i];
-                    console.log("Row " + i + ": ");
-                    var data1="";
-                    for(var j = 0; j < values.length; j++) {
-                        var field = fields[j];
-                        var value = values[j];
-                        if(field=='_raw'){
-                            count+=1;
-                        }
-                        // console.log("  " + field + ": " + value);
-                    }
-                }
-                resolve(count);
-            }
-        );
+
+  earliest_time: a,
+  latest_time: b,
+  //output_mode: "json_rows"
+ 
+};
+        var res = "";
+        //var searchParams = {
+        
+
+  //earliest_time: new Date(a),
+  //latest_time: new Date(b),
+  //output_mode: "json_rows"
+ 
+//};
+    service.oneshotSearch(
+  searchQuery,
+  searchParams,
+  function(err, results) {
+    // Display the results
+    if(err)
+    {
+        reject(err)
+    }
+    var fields = results.fields;
+    var rows = results.rows;
+    var count=0;
+
+    for(var i = 0; i < rows.length; i++) {
+      var values = rows[i];
+      
+      console.log("Row " + i + ": ");
+      var data1="";
+      for(var j = 0; j < values.length; j++) {
+        var field = fields[j];
+        var value = values[j];
+        
+        if(field=='_raw'){
+          count+=1;
+        }
+// console.log("  " + field + ": " + value);
+        
+       
+        
+      }
+
+    }
+
+    resolve(count);
+  }
+);
     });
 }
