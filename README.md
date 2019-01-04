@@ -1,14 +1,6 @@
-# Project Team 21
+# Project 
 
-## Student Names :
 
-- Mayur Barge
-
-- Varun Jain
-
-- Shubham Sandeep Sand
-
-- Abhishek Konduri
 
 
 
